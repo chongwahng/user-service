@@ -1,0 +1,64 @@
+## Generated mta.yaml based on template version 0.4.0
+## appName = user-service
+## language=java; multitenant=false
+## approuter=
+_schema-version: '3.1'
+ID: user-service
+version: 1.0.0-SNAPSHOT
+description: "user-service application"
+parameters:
+  enable-parallel-deployments: true
+   
+build-parameters:
+  before-all:
+   - builder: custom
+     commands:
+      - npm install --production
+      - npx -p @sap/cds-dk cds build --production
+
+modules:
+ # --------------------- SERVER MODULE ------------------------
+ - name: user-service-srv
+ # ------------------------------------------------------------
+   type: java.tomcat
+   path: srv
+   parameters:
+     buildpack: sap_java_buildpack
+   properties:
+     SPRING_PROFILES_ACTIVE: cloud
+     USE_JCO: true
+     SET_LOGGING_LEVEL: '{com.sap.core.connectivity.jco: DEBUG, com.sap.conn.jco: DEBUG, com.sap.xs.security: DEBUG, com.sap.cloud.security: DEBUG, com.sap.xs.env: DEBUG}'
+   build-parameters:
+     builder: custom
+     commands: [ mvn clean package ]
+     build-result: "target/*-exec.war"
+   provides:
+    - name: srv-api      # required by consumers of CAP services (e.g. approuter)
+      properties:
+        srv-url: ${default-url}
+   requires:
+     - name: my-dest-srv
+     - name: my-uaa-srv
+     - name: my-conn-srv
+
+resources:
+- name: my-dest-srv
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: destination
+    service-name: user-service-dest-srv
+    service-plan: lite     
+- name: my-uaa-srv
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: user-service-uaa-srv
+    service-plan: application
+- name: my-conn-srv
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: connectivity
+    service-plan: lite
+    service-name: user-service-conn-srv
+
